@@ -1,0 +1,120 @@
+# This is the SAM template that represents the architecture of your serverless application
+# https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-template-basics.html
+
+# The AWSTemplateFormatVersion identifies the capabilities of the template
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/format-version-structure.html
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  Start from scratch starter project
+
+# Transform section specifies one or more macros that AWS CloudFormation uses to process your template
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/transform-section-structure.html
+Transform: AWS::Serverless-2016-10-31
+
+# Shared configuration for all resources, more in
+# https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    # The PermissionsBoundary allows users to safely develop with their function's permissions constrained
+    # to their current application. All the functions and roles in this application have to include it and
+    # it has to be manually updated when you add resources to your application.
+    # More information in https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_boundaries.html
+    PermissionsBoundary: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/${AppId}-${AWS::Region}-PermissionsBoundary"
+
+Parameters:
+  AppId:
+    Type: String
+
+  DBName:
+    Type: String
+    Description: DB name
+    Default: mutantes
+
+  DBUser:
+    Type: String
+    Description: DB user
+    Default: root
+
+  DBPass:
+    Type: String
+    Description: DB pass
+    Default: mutantes123
+
+  DBHost:
+    Type: String
+    Description: db host
+    Default: mutansdb.cgdw3jx4fsqt.us-east-1.rds.amazonaws.com
+
+# Resources declares the AWS resources that you want to include in the stack
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/resources-section-structure.html
+Resources:
+  # Each Lambda function is defined by properties:
+  # https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+
+  # Lambda Function Layer for Node.js
+  LambdaFunctionLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: mutants-dependencies
+      Description: Dependencies for mutants Lambda Functions.
+      ContentUri: src/dependencies/
+      CompatibleRuntimes:
+        - nodejs12.x
+        - nodejs14.x
+      LicenseInfo: MIT
+      RetentionPolicy: Retain
+
+  # This is a Lambda function config associated with the source code: hello-from-lambda.js
+  isMutantsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/mutants
+      Handler: index.isMutantsHandler
+      Runtime: nodejs14.x
+      MemorySize: 128
+      Timeout: 60
+      Description: This lambda function allows you to identify mutants.
+      Policies:
+        # Give Lambda basic execution Permission to the helloFromLambda
+        - AWSLambdaBasicExecutionRole
+      Layers:
+        - !Ref LambdaFunctionLayer
+      Environment:
+        Variables:
+          DB_NAME: !Ref DBName
+          DB_USER: !Ref DBUser
+          DB_PASS: !Ref DBPass
+          DB_HOST: !Ref DBHost
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /mutant/
+            Method: POST
+
+  statsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/stats
+      Handler: index.statsHandler
+      Runtime: nodejs14.x
+      MemorySize: 128
+      Timeout: 60
+      Description: This lambda function allows you to get stats.
+      Policies:
+        # Give Lambda basic execution Permission to the helloFromLambda
+        - AWSLambdaBasicExecutionRole
+      Layers:
+        - !Ref LambdaFunctionLayer
+      Environment:
+        Variables:
+          DB_NAME: !Ref DBName
+          DB_USER: !Ref DBUser
+          DB_PASS: !Ref DBPass
+          DB_HOST: !Ref DBHost
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /stats
+            Method: GET
